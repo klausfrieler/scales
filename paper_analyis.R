@@ -10,6 +10,7 @@ style_map <- c("TRADITIONAL" = "Traditional",
                "FREE" = "Postmodern", 
                "POSTBOP" = "Postmodern", 
                "FUSION" = "Postmodern")
+
 cdpcx_class <- c("-" = "chrom", 
                  "%" = "chrom", 
                  "<" = "chrom", 
@@ -25,8 +26,6 @@ cdpcx_class <- c("-" = "chrom",
                  "L" = "chrom", 
                  "T" = "chrom", 
                  "X" = "X")
-
-
 get_chromatic_approach_table <- function(){
   tab <- wjd_transforms %>% 
     left_join(wjd_meta %>% select(id, style)) %>% 
@@ -44,6 +43,8 @@ get_chromatic_approach_table <- function(){
     pivot_wider(id_cols = c(poi, style), names_from = cdpcx_type, values_from = rel_freq) %>% 
     mutate(poi = c("Other", "Chromatic Approach")[poi]) %>% 
     knitr::kable(format = "latex", digits = 3)  
+  tab
+  
 }
 
 plot_pitch_type_by_year <- function(){
@@ -98,4 +99,72 @@ get_sixth_comparison_plot <- function(){
   q <- q + labs(x = "Rel. Frequency", y = "Scale Degree", fill = "")
   q <- q + facet_wrap(~type)
   q
+}
+cpc_cdpcx_map <-  list("0" = "1", 
+                       "1" = "-", 
+                       "2" = "2",
+                       "3" = list("min" = "3",
+                                  "7"   = "B",
+                                  "maj" = "B"),
+                       "4" = list("min" = ">",
+                                  "7"   = "3",
+                                  "maj" = "3"),
+                       "5" = "4",
+                       "6" = "T",
+                       "7" = "5",
+                       "8" = "%",
+                       "9" = "6",
+                       "10" = list("min" = "7", 
+                                   "7"   = "7",
+                                   "maj" = "<"),
+                       "11" = list("min" = "L",
+                                   "7"   = "L",
+                                   "maj" = "7")
+)
+chord_type_map <- c("min" = "min",
+                    "min6" = "min",
+                    "min7" = "min",
+                    "m7b5" = "min",
+                    "o" = "min",
+                    "o7" = "min",
+                    "minmaj" = "min",
+                    "minmaj7" = "min",
+                    "6" = "maj",
+                    "7" = "7",
+                    "maj" = "maj",
+                    "maj7" = "maj",
+                    "NC" = NA)
+
+recalc_cdpcx <- function(data = wjd_tpc){
+  chord_dictionary <- tibble(
+    chord = data$chord %>% 
+      unique()) %>% 
+    bind_cols(data$chord %>% 
+                unique() %>% 
+                parkR::parse_chord())
+  
+  tmp <- data %>% 
+    left_join(chord_dictionary %>% 
+                select(-pc, -bass, -bass_pc, -ext, chord_type = type), by = "chord") %>% 
+    mutate(cpc = (pitch - root_pc) %% 12)
+  
+  elements <- tmp %>% 
+    distinct(cpc, chord_type) %>% 
+    mutate(chord_type_short = chord_type_map[chord_type])
+  
+  elements$cdpcx <- 
+    map2_chr(as.character(elements$cpc), elements$chord_type_short, function(cpc, ct){
+      #browser()
+      if(is.na(ct)){
+        return("X")
+      }
+      tmp <- cpc_cdpcx_map[[cpc]]
+      if(length(tmp) > 1){
+        return(tmp[[ct]])
+      }
+      else{
+        return(tmp[[1]])
+      }
+    }) 
+  tmp %>% select(-cdpcx) %>% left_join(elements %>% select(cpc, chord_type, cdpcx)) 
 }
