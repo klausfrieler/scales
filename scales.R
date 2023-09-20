@@ -285,10 +285,12 @@ prepare_harmonic_analysis_eval <- function(){
     set_names(sprintf("%d", ids)) 
   openxlsx::write.xlsx(anas, "harmonic_analysis_evaluation.xlsx")
 }
+
 enumerate_sequence <- function(seq){
   rl <- rle(seq)
   rep(1:length(rl$lengths), rl$lengths)
 }
+
 get_chord_tone_connection <- function(data){
   tmp <- data %>% pull(cdpcx_raw) #%>% mutate(is_ct = cdpcx_raw %in% c("1", "3", "5", "7"))
   tmp <- c(tmp, "F")
@@ -301,6 +303,7 @@ get_chord_tone_connection <- function(data){
     })
   tmp[!str_detect(tmp,"F")]  
 }
+
 get_all_chord_tone_connection <- function(data){
   ids <- unique(data$id)
   conn_tab <-
@@ -313,4 +316,38 @@ get_all_chord_tone_connection <- function(data){
     unlist() %>% 
     table()
   conn_tab
+}
+
+generate_all_scales <- function(pitch_classes = 12, 
+                               scale_lengths = 5:8, 
+                               intervals = 1:3, 
+                               no_consecutive_semitones = T){
+  N <- 2^pitch_classes
+  mat <- matrix(as.integer(intToBits(0:(N - 1))), nrow = 32) %>% t()
+  rs <- rowSums(mat)
+  good_rows <- which(rs %in% scale_lengths)
+  mat <- mat[good_rows,]
+  mat <- mat[which(mat[,1] == 1),]
+  mat <- mat[, 1:12]
+  well_formed <- function(bit_vec){
+    tmp <- rle(c(bit_vec))
+    if(paste(bit_vec, collapse = "") == "100101110010"){
+       browser()
+    }
+    bad <- any(tmp$length[which(tmp$value == 1)] > (3 - as.integer(no_consecutive_semitones))) | any(tmp$length[which(tmp$value == 0)] > 2)
+    iv <- c(which(bit_vec == 1), 13) %>% diff()
+    iv_rle <- rle(iv)
+    bad  <- bad | any(iv_rle$length[which(iv_rle$values == 3)] > 1)
+    # if(!bad){
+    #   browser()
+    # }
+    return(!bad)
+  }
+  wf <- apply(mat, 1, well_formed)
+  mat <- mat[wf,]
+  tibble(BIV = apply(mat, 1, function(x) paste(x, collapse = "")), 
+         IV = apply(mat, 1, function(x) paste(c(which(x == 1), 13) %>% diff(), collapse = "")),
+         length = rowSums(mat),
+         has_semitone_cluster = str_detect(IV, "11")) %>% arrange(length, IV)
+  #browser()
 }
