@@ -30,11 +30,41 @@ scales_steps <- list(
   "htwt"= c(0, 1, 3, 4, 6, 7, 9, 10),
   "wtht"= c(0, 2, 3, 5, 6, 8, 9, 11),
   "maj-pent" = c(0, 2, 4, 7, 9),
+  "maj-pent-2" = c(0, 2, 5, 7, 9),
+  "maj-pent-3" = c(0, 2, 5, 7, 10),
   "min-pent" = c(0, 3, 5, 7, 10),
+  "min-pent-2" = c(0, 3, 5, 7, 9),
+  "min-pent-3" = c(0, 3, 5, 8, 10),
   "maj-blues" = c(0, 2, 3, 4, 7, 9),  
-  "min-blues" = c(0, 3, 5, 6, 7, 10)  
+  "min-blues" = c(0, 3, 5, 6, 7, 10),  
+  "aug" = c(0, 3, 4, 7, 8, 11),  
+  "aug-inv" = c(0, 1, 4, 5, 8, 9),  
+  #"lydian-dim" = c(0, 2, 3, 6, 7, 9, 10),  
+  "dorian-b5" = c(0, 2, 3, 5, 6, 9, 10),
+  "mela-ramapriya" = c(0, 1, 4, 6, 7, 9, 10),
+  "harm-min-inv" = c("0", "1", "4", "5", "7", "9", "10"),
+  "mela-sadvidharmargini" = c("0", "1", "3", "6", "7", "9", "10"),
+  "locrian-bb7" = c("0", "1", "3", "5", "6", "8", "9"),
+  "kathian" = c("0", "1", "3", "4", "7", "9", "10"),
+  "phrygian-b4" = c("0", "1", "3", "4", "7", "8", "10"),
+  "alt-hepta" = c("0", "1", "3", "4", "6", "7", "9"),
+  "lydian-b3" = c("0", "2", "3", "6", "7", "9", "11"),
+  "epylian" = c("0", "1", "3", "4", "6", "7", "10"),
+  "bebop-dom"= c(0, 2, 4, 5, 7, 9, 10, 11),
+  "bebop-maj"= c(0, 2, 4, 5, 7, 8, 9, 11),
+  "bebop-min"= c(0, 2, 3, 5, 7, 8, 9, 11),
+  "bebop-harm-min"= c(0, 2, 3, 5, 7, 8, 10, 11),
+  "dom-b5-dim"= c(0, 2, 4, 5, 6, 8, 10, 11),
+  "hung-min" = c(0, 2, 3, 6, 7, 8, 11),
+  "aeol-#4" = c(0, 2, 3, 6, 7, 8, 10)
 )
+scales_short  <- lapply(scales_steps, function(x) as.character(x) %>% str_replace("10", "A") %>% str_replace("11", "B") %>% paste(collapse = "")) 
+scales_map <- names(scales_short)
+names(scales_map) <- as.character(scales_short)
 
+get_scale_name <- function(scale_pc_str){
+  scales_map[scale_pc_str] %>% as.character()
+}
 get_standard_weights <- function(x, maj = 2, min = 1){
   w <- rep(min, 12)
   if(is.character(x)){
@@ -318,6 +348,18 @@ get_all_chord_tone_connection <- function(data){
   conn_tab
 }
 
+shifter <- function(x, n = 1) {
+  if (n == 0) x else c(tail(x, -n), head(x, n))
+}
+
+bin_to_pcs <- function(x){
+  paste(c(as.character(0:9), "A", "B")[which(x == 1)] %>% na.omit(), collapse = "")
+}
+
+pc_vec_to_str <- function(pcs){
+  as.character(pcs) %>% str_replace("10", "A")  %>% str_replace("11", "B") %>% paste(collapse = "")
+}
+
 generate_all_scales <- function(pitch_classes = 12, 
                                scale_lengths = 5:8, 
                                intervals = 1:3, 
@@ -330,14 +372,18 @@ generate_all_scales <- function(pitch_classes = 12,
   mat <- mat[which(mat[,1] == 1),]
   mat <- mat[, 1:12]
   well_formed <- function(bit_vec){
-    tmp <- rle(c(bit_vec))
-    if(paste(bit_vec, collapse = "") == "100101110010"){
-       browser()
-    }
+    tmp <- rle(bit_vec)
+    tmp_shift1 <- rle(shifter(bit_vec, 1))
+    tmp_shift_1 <- rle(shifter(bit_vec, -1))
+    # if(paste(bit_vec, collapse = "") == "100101110010"){
+    #    browser()
+    # }
     bad <- any(tmp$length[which(tmp$value == 1)] > (3 - as.integer(no_consecutive_semitones))) | any(tmp$length[which(tmp$value == 0)] > 2)
+    bad2 <- any(tmp_shift1$length[which(tmp_shift1$value == 1)] > (3 - as.integer(no_consecutive_semitones))) | any(tmp_shift1$length[which(tmp_shift1$value == 0)] > 2)
+    bad3 <- any(tmp_shift_1$length[which(tmp_shift_1$value == 1)] > (3 - as.integer(no_consecutive_semitones))) | any(tmp_shift_1$length[which(tmp_shift_1$value == 0)] > 2)
     iv <- c(which(bit_vec == 1), 13) %>% diff()
     iv_rle <- rle(iv)
-    bad  <- bad | any(iv_rle$length[which(iv_rle$values == 3)] > 1)
+    bad  <- bad | bad2 | bad3 | any(iv_rle$length[which(iv_rle$values == 3)] > 1)
     # if(!bad){
     #   browser()
     # }
@@ -345,9 +391,15 @@ generate_all_scales <- function(pitch_classes = 12,
   }
   wf <- apply(mat, 1, well_formed)
   mat <- mat[wf,]
-  tibble(BIV = apply(mat, 1, function(x) paste(x, collapse = "")), 
+  tibble(PCS = apply(mat, 1, bin_to_pcs),
+         BIV = apply(mat, 1, function(x) paste(x, collapse = "")), 
          IV = apply(mat, 1, function(x) paste(c(which(x == 1), 13) %>% diff(), collapse = "")),
+         n_iv = apply(mat, 1, function(x) length(unique(c(which(x == 1), 13) %>% diff()))),
          length = rowSums(mat),
-         has_semitone_cluster = str_detect(IV, "11")) %>% arrange(length, IV)
+         has_semitone_cluster = str_detect(IV, "11") | (substr(IV, 1, 1) == "1" & substr(IV, nchar(IV), nchar(IV)) == "1"),
+         has_threeone = str_detect(IV, "13") | str_detect(IV, "31")
+  ) %>% 
+    mutate(name = get_scale_name(PCS)) %>% 
+    arrange(length, IV) 
   #browser()
 }
