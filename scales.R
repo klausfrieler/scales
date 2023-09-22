@@ -29,10 +29,10 @@ scales_steps <- list(
   "wt"= c(0, 2, 4, 6, 8, 10),
   "htwt"= c(0, 1, 3, 4, 6, 7, 9, 10),
   "wtht"= c(0, 2, 3, 5, 6, 8, 9, 11),
-  "maj-pent" = c(0, 2, 4, 7, 9),
+  "maj-pent"   = c(0, 2, 4, 7, 9),
   "maj-pent-2" = c(0, 2, 5, 7, 9),
   "maj-pent-3" = c(0, 2, 5, 7, 10),
-  "min-pent" = c(0, 3, 5, 7, 10),
+  "min-pent"   = c(0, 3, 5, 7, 10),
   "min-pent-2" = c(0, 3, 5, 7, 9),
   "min-pent-3" = c(0, 3, 5, 8, 10),
   "maj-blues" = c(0, 2, 3, 4, 7, 9),  
@@ -42,14 +42,14 @@ scales_steps <- list(
   #"lydian-dim" = c(0, 2, 3, 6, 7, 9, 10),  
   "dorian-b5" = c(0, 2, 3, 5, 6, 9, 10),
   "mela-ramapriya" = c(0, 1, 4, 6, 7, 9, 10),
-  "harm-min-inv" = c("0", "1", "4", "5", "7", "9", "10"),
-  "mela-sadvidharmargini" = c("0", "1", "3", "6", "7", "9", "10"),
-  "locrian-bb7" = c("0", "1", "3", "5", "6", "8", "9"),
-  "kathian" = c("0", "1", "3", "4", "7", "9", "10"),
-  "phrygian-b4" = c("0", "1", "3", "4", "7", "8", "10"),
-  "alt-hepta" = c("0", "1", "3", "4", "6", "7", "9"),
-  "lydian-b3" = c("0", "2", "3", "6", "7", "9", "11"),
-  "epylian" = c("0", "1", "3", "4", "6", "7", "10"),
+  "harm-min-inv" = c(0, 1, 4, 5, 7, 9, 10),
+  "mela-sadvidharmargini" = c(0, 1, 3, 6, 7, 9, 10),
+  "locrian-bb7" = c(0, 1, 3, 5, 6, 8, 9),
+  "kathian" = c(0, 1, 3, 4, 7, 9, 10),
+  "phrygian-b4" = c(0, 1, 3, 4, 7, 8, 10),
+  "alt-hepta" = c(0, 1, 3, 4, 6, 7, 9),
+  "lydian-b3" = c(0, 2, 3, 6, 7, 9, 11),
+  "epylian" = c(0, 1, 3, 4, 6, 7, 10),
   "bebop-dom"= c(0, 2, 4, 5, 7, 9, 10, 11),
   "bebop-maj"= c(0, 2, 4, 5, 7, 8, 9, 11),
   "bebop-min"= c(0, 2, 3, 5, 7, 8, 9, 11),
@@ -65,6 +65,65 @@ names(scales_map) <- as.character(scales_short)
 get_scale_name <- function(scale_pc_str){
   scales_map[scale_pc_str] %>% as.character()
 }
+
+lsd_map <- c(
+"i" = "i7",
+"I" = "Ij7",
+"i7" = "i7", 
+"I7" = "I7",
+"ii" = "ii7", 
+"ii7" = "ii7", 
+"IIb7" = "IIb7", 
+"iibo" = "iibo7", 
+"iibo7" = "iibo7",
+"iii" = "iii7", 
+"iii7" = "iii7", 
+"iim7b5" = "iim7b5", 
+"iio" = "iio", 
+"ij7" = "ij7", 
+"Ij7" = "Ij7", 
+"io" = "io7", 
+"io7" = "io7",
+"iv" = "iv7", 
+"IV" = "IVj7", 
+"iv7" = "iv7", 
+"IV7" = "IV7", 
+"IVj7" = "IVj7", 
+"ivo" = "ivo7", 
+"ivo7" = "ivo7",
+"V" = "V7", 
+"V7" = "V7", 
+"vi" = "vi7", 
+"vi7" = "vi7", 
+"VIb" = "VIb7", 
+"VIbj7" = "Vib7", 
+"vibo" = "vibo7", 
+"vibo7" = "vibo7", 
+"VII7" = "VII7", 
+"VIIb" = "VIIb", 
+"viio" = "viio7", 
+"viio7"= "viio7")
+
+cpc_map <- c(as.character(0:9), "A", "B", "X")
+
+freq_table_group <- function(x, group_var, prop_var, sort = T) {
+  group_var <- enquo(group_var)
+  prop_var  <- enquo(prop_var)
+  tmp <- x %>%
+    group_by(!!group_var) %>% 
+    mutate(n_group = n()) %>% 
+    ungroup() %>% 
+    group_by(!!group_var, !!prop_var, n_group) %>%
+    summarise(n = n(), 
+              .groups = "drop" ) %>%
+    mutate(freq = n /sum(n), freq_group = n/n_group)
+  if(sort){
+    tmp <- tmp %>% arrange(desc(n))
+  }
+  tmp
+  #tmp %>% ggplotf(aes_string(x = rlang::quo_text(prop_var), y= "freq")) + geom_col()
+}
+
 get_standard_weights <- function(x, maj = 2, min = 1){
   w <- rep(min, 12)
   if(is.character(x)){
@@ -91,6 +150,7 @@ get_standard_weights <- function(x, maj = 2, min = 1){
   }
   w
 }
+
 bin_scale_sim <- function(x, y){
   x <- x %% 12
   y <- y %% 12
@@ -102,7 +162,7 @@ bin_scale_sim <- function(x, y){
   cor(xb, yb)
 }
 
-cos_sim <- function(x, y){
+cos_sim_mod12 <- function(x, y){
   x <- x %% 12
   y <- y %% 12
   xb <- rep(0, 12)
@@ -110,7 +170,7 @@ cos_sim <- function(x, y){
   yb <- rep(0, 12)
   yb[y] <- 1
   #sum(xb * yb)/sqrt(sum(xb)*sum(yb))  
-  sum(xb*yb)/sqrt(sum(xb*xb)*sum(yb*yb))
+  sum(xb*yb)/sqrt(sum(xb*xb) * sum(yb*yb))
   
 }
 jaccard_sim <- function(x, y){
@@ -232,7 +292,7 @@ get_Scale_similarity_with_transpositions <- function(as_dist_matrix = T){
   
   all_scales <- all_scales[norm_scales]
   n <- length(all_scales)
-  d_mat <- matrix(rep(0, n*n), ncol = n, nrow = n, dimnames = list(norm_scales, norm_scales))
+  d_mat <- matrix(rep(0, n * n), ncol = n, nrow = n, dimnames = list(norm_scales, norm_scales))
   ret <- 
     map_dfr(1:(n-1), function(i){
       map_dfr((i):n, function(j){
@@ -360,6 +420,14 @@ pc_vec_to_str <- function(pcs){
   as.character(pcs) %>% str_replace("10", "A")  %>% str_replace("11", "B") %>% paste(collapse = "")
 }
 
+pc_str_to_vec <- function(pcs){
+  ret <- lapply(pcs %>% str_split(""), function(x) x %>% str_replace("A", "10")  %>% str_replace("B", "11") %>% as.integer())
+  if(length(pcs) == 1){
+    ret <- ret[[1]]
+  }
+  ret
+}
+
 generate_all_scales <- function(pitch_classes = 12, 
                                scale_lengths = 5:8, 
                                intervals = 1:3, 
@@ -400,6 +468,192 @@ generate_all_scales <- function(pitch_classes = 12,
          has_threeone = str_detect(IV, "13") | str_detect(IV, "31")
   ) %>% 
     mutate(name = get_scale_name(PCS)) %>% 
-    arrange(length, IV) 
+    arrange(length, IV) %>% 
+    mutate(good_scale = (!has_semitone_cluster | !is.na(name)) & (!has_threeone | !is.na(name)))
   #browser()
 }
+
+all_scales <- generate_all_scales(no_consecutive_semitones = F)
+
+cos_sim <- function(x, y){
+  sum(x*y)/sqrt(sum(x*x) * sum(y*y))
+}
+
+vec_norm <- function(x){
+  x/sqrt(sum(x*x))
+}
+
+vec_norm_max <- function(x){
+  x/max(abs(x))
+}
+
+weight_biv <- function(biv){
+  weights <- c(3, 1, 1, 2, 2, 1, 3, 3, 1, 1, 2, 2)
+  #weights <- weights/sqrt(sum(weights*weights))
+  #browser()
+  if(is.list(biv)){
+    lapply(biv, function(x) vec_norm_max(x * weights))
+  }
+  else{
+    vec_norm_max(biv * weights)
+  }
+}
+
+get_scale_fits <- function(cpc_vec, test_scales = NULL, ret_top_n = 1, weighting = T, norm = c("euclid", "max")){
+  norm <- match.arg(norm)
+  if(is.null(test_scales) || !("biv_vec" %in% names(test_scales))){
+    test_scales <- all_scales %>%
+      filter(good_scale,  n_iv == 2, (!has_threeone || str_detect(name, "blues"))) %>% 
+      bind_rows(all_scales %>% filter(str_detect(name, "blues"))) %>% 
+      mutate(biv_vec =  lapply(str_split(BIV, ""), as.integer))
+  }
+  if(weighting){
+    test_scales <- test_scales %>% mutate(biv_vec = weight_biv(biv_vec)) 
+  }
+  test_scales <- test_scales %>% 
+    mutate(scale_value = as.integer(str_detect(name, "[0-9]+")) + as.integer(str_detect(name, "-")) - as.integer(str_detect(name, "pent")))
+  cpc_tab <- table(factor(cpc_vec, levels = 0:11))
+  browser()
+  
+  scale_mat <- test_scales$biv_vec %>% 
+    unlist()  %>% 
+    matrix(ncol = nrow(test_scales), nrow = 12) %>% 
+    t()
+  
+  if(norm == "euclid"){
+    scale_mat_norm <- t(apply(scale_mat, 1, vec_norm))
+    cpc_tab_norm <- cpc_tab/sqrt(sum(cpc_tab * cpc_tab))
+  }
+  else{
+    scale_mat_norm <- t(apply(scale_mat, 1, vec_norm_max))
+    cpc_tab_norm <- cpc_tab/max(cpc_tab)
+  }
+  sims <- scale_mat_norm %*% cpc_tab_norm
+  sims <- (t(sims) * (1 - .1 * test_scales$scale_value/2)) %>% as.vector()
+  ret <- test_scales %>%
+    select(-biv_vec, -has_semitone_cluster, -has_threeone) %>%
+    mutate(sim = sims,
+           n_vec = length(cpc_vec),
+           cpc_vec = pc_vec_to_str(cpc_vec)) %>%
+    arrange(desc(sim))
+  # ret <- map_dfr(1:nrow(test_scales), function(i){
+  #   # if(pc_vec_to_str(cpc_vec) == "73764"){
+  #   #   browser()
+  #   # }
+  #   #browser()
+  #   biv <- test_scales$biv_vec[i][[1]]
+  #   sim <- cos_sim(cpc_tab, biv) * ( 1- .1 * test_scales$scale_value[i]/2)
+  #   test_scales[i,] %>%
+  #     select(-biv_vec, -has_semitone_cluster, -has_threeone) %>%
+  #     mutate(sim = sim,
+  #            n_vec = length(cpc_vec),
+  #            cpc_vec = pc_vec_to_str(cpc_vec))
+  # }) %>%
+  #   arrange(desc(sim))
+  
+  if(!is.null(ret_top_n)){
+    ret <- ret %>% top_n(ret_top_n, sim)
+  }
+  ret
+}
+
+get_all_scale_fits <- function(data = wjd_tpc){
+  ids <- unique(data$id)
+  map_dfr(ids, function(i){
+    tmp <- data %>% filter(id == i)
+    messagef("Checking %s", i)
+    map_dfr(unique(tmp$chord_id), function(cid) {
+      tmp2 <- tmp[tmp$chord_id == cid,]
+      get_scale_fits(tmp2$cpc) %>% 
+        mutate(chord_id = cid, 
+               local_scale_degree =  unique(tmp2$local_scale_degree))
+    })
+  })
+}
+
+get_all_scale_fits_fast <- function(data = wjd_tpc, test_scales = NULL, ret_top_n = 1, weighting = T, norm = c("euclid", "max")){
+  norm <- match.arg(norm)
+  ids <- unique(data$id)
+  #browser()
+  if(length(ids) > 1){
+    return(map_dfr(ids, function(id) get_all_scale_fits_fast(data[data$id == id,])))
+  }
+  if(is.null(test_scales) || !("biv_vec" %in% names(test_scales))){
+    test_scales <- all_scales %>%
+      filter(good_scale,  n_iv == 2, !has_threeone) %>% 
+      bind_rows(all_scales %>% filter(str_detect(name, "blues"))) %>% 
+      mutate(biv_vec =  lapply(str_split(BIV, ""), as.integer))
+  }
+  if(weighting){
+    test_scales <- test_scales %>% mutate(biv_vec = weight_biv(biv_vec)) 
+  }
+  test_scales <- test_scales %>% 
+    mutate(scale_value = as.integer(str_detect(name, "[0-9]+")) + as.integer(str_detect(name, "-")) - as.integer(str_detect(name, "pent")))
+  #browser()
+  data <- data %>% 
+    group_by(id) %>% 
+    mutate(chord_id = enumerate_sequence(chord),
+           event_id = 1:n()) %>% ungroup() 
+  split_df <- data %>%  
+    split(data$chord_id)
+  cpc_vecs <- map_dfr(1:length(split_df), function(i) {
+    tibble(chord_id = i,
+           local_scale_degree = unique(split_df[[i]]$local_scale_degree),
+           local_key = unique(split_df[[i]]$local_key),
+           chord = unique(split_df[[i]]$chord),
+           n_vec = length(split_df[[i]]$cpc), 
+           cpc_vec = pc_vec_to_str(split_df[[i]]$cpc))
+    })
+  if(norm == "euclid"){
+    norm_func = vec_norm
+  }
+  else{
+    norm_func = vec_norm_max
+  }
+  cpc_tab_norm <- lapply(split_df, 
+                     function(x){norm_func(table(factor(x$cpc, levels = 0:11)))} ) %>% 
+    unlist() %>% 
+    matrix(nrow = 12) 
+  #browser()
+  scale_mat <- test_scales$biv_vec %>% unlist()  %>% matrix(ncol = nrow(test_scales), nrow = 12) %>% t()
+  #scale_mat_norm <- t(apply(scale_mat, 1, vec_norm))
+  scale_mat_norm <- t(apply(scale_mat, 1, norm_func))
+  #cpc_tab_norm <- cpc_tab/sqrt(sum(cpc_tab * cpc_tab))
+  sims <- scale_mat_norm %*% cpc_tab_norm
+  #sims_weighted <- (t(sims) * (1 - .1 * test_scales$scale_value/2)) 
+  sims_weighted <- apply(sims, 2, function(x) x*(1 - .1 * test_scales$scale_value/2)) %>% t()
+  #browser()
+  
+  ret <- sims_weighted %>% 
+    as.data.frame.matrix %>% 
+    as_tibble() %>% 
+    set_names(test_scales$name) %>% 
+    mutate(chord_id = 1:nrow(.)) %>% 
+    pivot_longer(-chord_id) %>% 
+    rename(sim = value)
+  
+  if(!is.null(ret_top_n)){
+    ret <- ret %>% 
+      group_by(chord_id) %>% 
+      top_n(ret_top_n, sim) %>%
+      ungroup()
+  }
+  
+  ret <- ret %>% left_join(cpc_vecs, by = "chord_id", relationship = "many-to-many") 
+  ret$id <- unique(data$id)
+  ret <- ret %>%  left_join(
+    test_scales %>%
+      select(-biv_vec, -has_semitone_cluster, -has_threeone), 
+    by = "name") %>% 
+    select(id, chord_id, chord, local_scale_degree, cpc_vec, sim, everything())
+  if(!is.null(ret_top_n)){
+    ret <- ret %>% 
+      group_by(chord_id) %>% 
+      top_n(-ret_top_n, length) %>%
+      ungroup()
+  }
+  #   arrange(desc(sim))
+  #browser()
+  ret
+}
+  
