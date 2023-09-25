@@ -95,8 +95,8 @@ lsd_map <- c(
 "V7" = "V7", 
 "vi" = "vi7", 
 "vi7" = "vi7", 
-"VIb" = "VIb7", 
-"VIbj7" = "Vib7", 
+"VIb" = "VIbj7", 
+"VIbj7" = "VIbj7", 
 "vibo" = "vibo7", 
 "vibo7" = "vibo7", 
 "VII7" = "VII7", 
@@ -473,7 +473,7 @@ generate_all_scales <- function(pitch_classes = 12,
   #browser()
 }
 
-all_scales <- generate_all_scales(no_consecutive_semitones = F)
+#all_scales <- generate_all_scales(no_consecutive_semitones = F)
 
 cos_sim <- function(x, y){
   sum(x*y)/sqrt(sum(x*x) * sum(y*y))
@@ -503,8 +503,8 @@ get_scale_fits <- function(cpc_vec, test_scales = NULL, ret_top_n = 1, weighting
   norm <- match.arg(norm)
   if(is.null(test_scales) || !("biv_vec" %in% names(test_scales))){
     test_scales <- all_scales %>%
-      filter(good_scale,  n_iv == 2, (!has_threeone || str_detect(name, "blues"))) %>% 
-      bind_rows(all_scales %>% filter(str_detect(name, "blues"))) %>% 
+      filter(good_scale,  n_iv == 2, !has_threeone) %>% 
+      bind_rows(all_scales %>% filter(str_detect(name, "blues|^wt$"))) %>% 
       mutate(biv_vec =  lapply(str_split(BIV, ""), as.integer))
   }
   if(weighting){
@@ -581,8 +581,10 @@ get_all_scale_fits_fast <- function(data = wjd_tpc, test_scales = NULL, ret_top_
   if(is.null(test_scales) || !("biv_vec" %in% names(test_scales))){
     test_scales <- all_scales %>%
       filter(good_scale,  n_iv == 2, !has_threeone) %>% 
-      bind_rows(all_scales %>% filter(str_detect(name, "blues"))) %>% 
+      bind_rows(all_scales %>% filter(str_detect(name, "blues|^wt$"))) %>% 
+      distinct() %>% 
       mutate(biv_vec =  lapply(str_split(BIV, ""), as.integer))
+    #browser()
   }
   if(weighting){
     test_scales <- test_scales %>% mutate(biv_vec = weight_biv(biv_vec)) 

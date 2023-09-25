@@ -168,3 +168,41 @@ recalc_cdpcx <- function(data = wjd_tpc){
     }) 
   tmp %>% select(-cdpcx) %>% left_join(elements %>% select(cpc, chord_type, cdpcx)) 
 }
+
+scale_lsd_heat_map <- function(scale_fits, min_n = 100, save = T){
+  scale_fits <- scale_fits %>% 
+    left_join(wjd_meta %>% 
+                select(id, style, tonality_type)) %>% 
+    mutate(red_style = style_map[style])
+  prep <- scale_fits 
+   
+  # prep <- scale_fits %>% 
+  # mutate(style = style_map[style]) %>%  
+  #   filter(style %in% "Postmodern") 
+  prep <- prep %>% 
+    filter(n_vec > 4, !is.na(local_scale_degree)) %>% 
+    mutate(local_scale_degree = lsd_map[local_scale_degree]) %>% 
+    group_by(local_scale_degree) %>% 
+    mutate(n_lsd = n())  %>% 
+    group_by(local_scale_degree, name) %>% 
+    summarise(n = n(), n_tot = max(n_lsd), freq = n/n_tot, .groups = "drop")  
+  #browser()
+  prep <- prep %>%  
+    filter(n_tot >= min_n) 
+  
+  q <- prep %>% 
+    ggplot(aes(x = fct_reorder(local_scale_degree, n_tot, median) %>% fct_rev(), 
+               y = fct_reorder(name, freq, sum)%>% fct_rev() %>% fct_rev(), 
+               fill = freq))
+  q <- q + geom_tile() 
+  q <- q + scale_fill_viridis_c(option = "C", direction = 1) 
+  q <- q + geom_text(aes(label = sprintf("%02d", round(100*freq, 0))), colour = "grey96")
+  q <- q + theme_minimal() 
+  q <- q + labs(x = "Local Scale Degree", y = "Scale", fill = "Rel. Freq.")  
+  q <- q + theme(panel.grid.major = element_blank(), 
+                 panel.grid.minor = element_blank(), 
+                 panel.background = element_rect(fill = "darkblue"), 
+                 axis.text.x = element_text(size = 11),  
+                 axis.text.y = element_text(size = 11))
+  q
+}
