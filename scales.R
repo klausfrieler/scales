@@ -571,13 +571,17 @@ get_all_scale_fits <- function(data = wjd_tpc){
   })
 }
 
-get_all_scale_fits_fast <- function(data = wjd_tpc, test_scales = NULL, ret_top_n = 1, weighting = T, norm = c("euclid", "max")){
-  norm <- match.arg(norm)
+get_all_scale_fits_fast <- function(data = wjd_tpc, 
+                                    test_scales = NULL, 
+                                    ret_top_n = 1, 
+                                    weighting = c("chordal", "flat"), 
+                                    cpc_tab = c("freq", "indicator"),
+                                    norm = c("euclid", "max")){
   ids <- unique(data$id)
-  #browser()
-  if(length(ids) > 1){
-    return(map_dfr(ids, function(id) get_all_scale_fits_fast(data[data$id == id,])))
-  }
+  weighting <- match.arg(weighting)
+  norm <- match.arg(norm)
+  cpc_tab <- match.arg(cpc_tab)
+  
   if(is.null(test_scales) || !("biv_vec" %in% names(test_scales))){
     test_scales <- all_scales %>%
       filter(good_scale,  n_iv == 2, !has_threeone) %>% 
@@ -586,18 +590,31 @@ get_all_scale_fits_fast <- function(data = wjd_tpc, test_scales = NULL, ret_top_
       mutate(biv_vec =  lapply(str_split(BIV, ""), as.integer))
     #browser()
   }
-  if(weighting){
+  if(weighting == "chordal"){
     test_scales <- test_scales %>% mutate(biv_vec = weight_biv(biv_vec)) 
   }
   test_scales <- test_scales %>% 
     mutate(scale_value = as.integer(str_detect(name, "[0-9]+")) + as.integer(str_detect(name, "-")) - as.integer(str_detect(name, "pent")))
+  
+  if(length(ids) > 1){
+    return(map_dfr(ids, function(id) {
+      get_all_scale_fits_fast(data[data$id == id,], 
+                              test_scales = test_scales, 
+                              weighting = weighting,
+                              ret_top_n = ret_top_n,
+                              norm = norm)
+    }))
+  }
+  
   #browser()
   data <- data %>% 
     group_by(id) %>% 
     mutate(chord_id = enumerate_sequence(chord),
            event_id = 1:n()) %>% ungroup() 
+  
   split_df <- data %>%  
     split(data$chord_id)
+  
   cpc_vecs <- map_dfr(1:length(split_df), function(i) {
     tibble(chord_id = i,
            local_scale_degree = unique(split_df[[i]]$local_scale_degree),
@@ -613,16 +630,24 @@ get_all_scale_fits_fast <- function(data = wjd_tpc, test_scales = NULL, ret_top_
     norm_func = vec_norm_max
   }
   cpc_tab_norm <- lapply(split_df, 
-                     function(x){norm_func(table(factor(x$cpc, levels = 0:11)))} ) %>% 
+                     function(x){
+                       if(cpc_tab == "freq"){
+                         tab <- table(factor(x$cpc, levels = 0:11))
+                       }
+                       else{
+                         tab <- table(factor(unique(x$cpc), levels = 0:11))
+                       }
+                       norm_func(tab)} ) %>% 
     unlist() %>% 
     matrix(nrow = 12) 
+  
   #browser()
-  scale_mat <- test_scales$biv_vec %>% unlist()  %>% matrix(ncol = nrow(test_scales), nrow = 12) %>% t()
-  #scale_mat_norm <- t(apply(scale_mat, 1, vec_norm))
+  scale_mat <- test_scales$biv_vec %>% 
+    unlist()  %>%
+    matrix(ncol = nrow(test_scales), nrow = 12) %>% 
+    t()
   scale_mat_norm <- t(apply(scale_mat, 1, norm_func))
-  #cpc_tab_norm <- cpc_tab/sqrt(sum(cpc_tab * cpc_tab))
   sims <- scale_mat_norm %*% cpc_tab_norm
-  #sims_weighted <- (t(sims) * (1 - .1 * test_scales$scale_value/2)) 
   sims_weighted <- apply(sims, 2, function(x) x*(1 - .1 * test_scales$scale_value/2)) %>% t()
   #browser()
   
