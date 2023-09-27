@@ -68,7 +68,9 @@ get_scale_name <- function(scale_pc_str){
 
 lsd_map <- c(
 "i" = "i7",
+"i6" = "i7",
 "I" = "Ij7",
+"I6" = "Ij7",
 "i7" = "i7", 
 "I7" = "I7",
 "ii" = "ii7", 
@@ -79,7 +81,8 @@ lsd_map <- c(
 "iii" = "iii7", 
 "iii7" = "iii7", 
 "iim7b5" = "iim7b5", 
-"iio" = "iio", 
+"iio" = "iio7", 
+"iio7" = "iio7", 
 "ij7" = "ij7", 
 "Ij7" = "Ij7", 
 "io" = "io7", 
@@ -87,6 +90,7 @@ lsd_map <- c(
 "iv" = "iv7", 
 "IV" = "IVj7", 
 "iv7" = "iv7", 
+"iv6" = "iv7", 
 "IV7" = "IV7", 
 "IVj7" = "IVj7", 
 "ivo" = "ivo7", 
@@ -100,12 +104,16 @@ lsd_map <- c(
 "vibo" = "vibo7", 
 "vibo7" = "vibo7", 
 "VII7" = "VII7", 
-"VIIb" = "VIIb", 
+"VIIb7" = "VIIb7", 
+"VIIb" = "VIIb7", 
 "viio" = "viio7", 
 "viio7"= "viio7")
 
 cpc_map <- c(as.character(0:9), "A", "B", "X")
-
+set_na <- function(x, value){
+  x[is.na(x)] <- value
+  x
+}
 freq_table_group <- function(x, group_var, prop_var, sort = T) {
   group_var <- enquo(group_var)
   prop_var  <- enquo(prop_var)
@@ -599,9 +607,10 @@ get_all_scale_fits_fast <- function(data = wjd_tpc,
   if(length(ids) > 1){
     return(map_dfr(ids, function(id) {
       get_all_scale_fits_fast(data[data$id == id,], 
-                              test_scales = test_scales, 
+                              test_scales = NULL, 
                               weighting = weighting,
                               ret_top_n = ret_top_n,
+                              cpc_tab = cpc_tab,
                               norm = norm)
     }))
   }
@@ -650,7 +659,9 @@ get_all_scale_fits_fast <- function(data = wjd_tpc,
   sims <- scale_mat_norm %*% cpc_tab_norm
   sims_weighted <- apply(sims, 2, function(x) x*(1 - .1 * test_scales$scale_value/2)) %>% t()
   #browser()
-  
+  # assign(sprintf("cpc_tab_norm_%s_%s_%s", weighting, cpc_tab, data$melid[[1]]), cpc_tab_norm, globalenv())
+  # assign(sprintf("scale_mat_norm_%s_%s_%s", weighting, cpc_tab, data$melid[[1]]), scale_mat_norm, globalenv())
+  # assign(sprintf("sims_%s_%s_%s", weighting, cpc_tab, data$melid[[1]]), sims, globalenv())
   ret <- sims_weighted %>% 
     as.data.frame.matrix %>% 
     as_tibble() %>% 
@@ -673,6 +684,7 @@ get_all_scale_fits_fast <- function(data = wjd_tpc,
       select(-biv_vec, -has_semitone_cluster, -has_threeone), 
     by = "name") %>% 
     select(id, chord_id, chord, local_scale_degree, cpc_vec, sim, everything())
+  
   if(!is.null(ret_top_n)){
     ret <- ret %>% 
       group_by(chord_id) %>% 

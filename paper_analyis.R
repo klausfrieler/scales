@@ -26,6 +26,7 @@ cdpcx_class <- c("-" = "chrom",
                  "L" = "chrom", 
                  "T" = "chrom", 
                  "X" = "X")
+
 get_chromatic_approach_table <- function(){
   tab <- wjd_transforms %>% 
     left_join(wjd_meta %>% select(id, style)) %>% 
@@ -83,7 +84,7 @@ plot_pitch_type_by_year <- function(){
 
 get_sixth_comparison_plot <- function(){
   q <- 
-    jazzodata::wjd_tpc %>% 
+    wjd_tpc %>% 
     filter(local_scale_degree %in% c("ii7", "iii7", "iv7", "vi7", "i7", "v7"), 
            tonality_type != "MODAL") %>% 
     group_by(melid, bar, local_scale_degree) %>% 
@@ -172,7 +173,8 @@ recalc_cdpcx <- function(data = wjd_tpc){
 scale_lsd_heat_map <- function(scale_fits, min_n = 100, fname = "", sort_scales = T, sort_scale_degrees = T){
   scale_fits <- scale_fits %>% 
     left_join(wjd_meta %>% 
-                select(id, style, tonality_type)) %>% 
+                select(id, style, tonality_type), 
+              by = "id") %>% 
     mutate(red_style = style_map[style])
   prep <- scale_fits 
    
@@ -190,7 +192,7 @@ scale_lsd_heat_map <- function(scale_fits, min_n = 100, fname = "", sort_scales 
 
   prep <- prep %>%  
     filter(n_tot >= min_n) %>% 
-    mutate(text_colour = factor(freq >= .5 * max(freq), labels = c("white", "black")))
+    mutate(text_colour = factor(freq <= .5 * max(freq), labels = c("white", "black")))
   if(sort_scales){
     prep <- prep %>% 
       mutate(name = fct_reorder(name, freq, sum))
@@ -204,18 +206,201 @@ scale_lsd_heat_map <- function(scale_fits, min_n = 100, fname = "", sort_scales 
                y = name, 
                fill = freq))
   q <- q + geom_tile() 
-  q <- q + scale_fill_viridis_c(option = "F", direction = 1) 
+  #q <- q + scale_fill_viridis_c(option = "F", direction = -1) 
+  q <- q + scale_fill_gradient(low = "white", high = "#083e81")
   q <- q + geom_text(aes(label = sprintf("%02d", round(100 * freq, 0)), colour = text_colour))
-  q <- q + scale_colour_manual(values = c("grey65", "black"), guide = "none")
+  q <- q + scale_colour_manual(values = c("white", "black"), guide = "none")
   q <- q + theme_minimal() 
   q <- q + labs(x = "Local Scale Degree", y = "Scale", fill = "Rel. Freq.")  
   q <- q + theme(panel.grid.major = element_blank(), 
                  panel.grid.minor = element_blank(), 
-                 panel.background = element_rect(fill = "black"), 
+                 panel.background = element_rect(fill = "white"), 
                  axis.text.x = element_text(size = 11),  
                  axis.text.y = element_text(size = 11))
   if(nchar(fname) > 0 ){
     ggsave(fname, plot = q, dpi = 600)
   }
+  q
+}
+
+plot_all_heat_maps <- function(recalc = F){
+  if(recalc || !exists("all_scale_fits_weighted_freq")){
+    all_scale_fits_weighted_freq <-    
+      get_all_scale_fits_fast(wjd_tpc, ret_top_n = 1, weighting = "chordal", cpc_tab = "freq")
+    assign("all_scale_fits_weighted_freq", all_scale_fits_weighted_freq, globalenv())
+    writexl::write_xlsx(all_scale_fits_weighted_freq, "all_scale_fits_weighted_freq.xlsx")
+  }
+  if(recalc || !exists("all_scale_fits_weighted_ind")){
+    all_scale_fits_weighted_ind <-    
+      get_all_scale_fits_fast(wjd_tpc, ret_top_n = 1, weighting = "chordal", cpc_tab = "indicator")
+    assign("all_scale_fits_weighted_ind", all_scale_fits_weighted_ind, globalenv())
+    writexl::write_xlsx(all_scale_fits_weighted_ind, "all_scale_fits_weighted_ind.xlsx")
+  }
+  if(recalc || !exists("all_scale_fits_flat_freq")){
+    all_scale_fits_flat_freq <-    
+      get_all_scale_fits_fast(wjd_tpc, ret_top_n = 1, weighting = "flat", cpc_tab = "freq")
+    assign("all_scale_fits_flat_freq", all_scale_fits_flat_freq, globalenv())
+    writexl::write_xlsx(all_scale_fits_flat_freq, "all_scale_fits_flat_freq.xlsx")
+  }
+  if(recalc || !exists("all_scale_fits_flat_ind")){
+    all_scale_fits_flat_ind <-    
+      get_all_scale_fits_fast(wjd_tpc, ret_top_n = 1, weighting = "flat", cpc_tab = "indicator")
+    assign("all_scale_fits_flat_ind", all_scale_fits_flat_ind, globalenv())
+    writexl::write_xlsx(all_scale_fits_flat_ind, "all_scale_fits_flat_ind.xlsx")
+  }
+  q <- scale_lsd_heat_map(all_scale_fits_weighted_freq)
+  ggsave(plot = q, filename = "figs/all_scale_fits_weighted_freq.png", dpi = 600)
+
+  q <- scale_lsd_heat_map(all_scale_fits_weighted_ind)
+  ggsave(plot = q, filename = "figs/all_scale_fits_weighted_ind.png", dpi = 600)
+  
+  q <- scale_lsd_heat_map(all_scale_fits_flat_freq)
+  ggsave(plot = q, filename = "figs/all_scale_fits_flat_freq.png", dpi = 600)
+  
+  q <- scale_lsd_heat_map(all_scale_fits_flat_ind)
+  ggsave(plot = q, filename = "figs/all_scale_fits_flat_ind.png", dpi = 600)
+  return("Done")
+}
+
+blues_trigrams_succ_pred <- function(data = wjd_tpc){
+  tmp <- wjd_tpc %>%  
+    group_by(id) %>% 
+    mutate(cdpcx_bigrams = sprintf("%s%s", 
+                                   cdpcx, 
+                                   lead(cdpcx, default = "$")), 
+           cdpcx_trigrams = sprintf("%s%s%s", cdpcx, 
+                                    lead(cdpcx, default = "$"), 
+                                    lead(cdpcx, 2, default = "$")))  %>% 
+    ungroup() %>% 
+    mutate(is_blues = factor(tonality_type == "BLUES", labels = c("no_blues", "blues"))) %>% filter(str_detect(substr(cdpcx_trigrams, 2,2), "B"))  %>% 
+    mutate(pred = substr(cdpcx_trigrams, 1, 1), 
+           succ = substr(cdpcx_trigrams, 3, 3)) 
+  blues_succ <- tmp %>% 
+    select(pred, succ, cdpcx_trigrams, is_blues)  %>% 
+    filter(is_blues == "blues") %>% 
+    group_by(succ) %>% 
+    summarise(n = n(), tot = nrow(.), freq = n/tot) %>% 
+    arrange(desc(freq))
+  blues_pred <- tmp %>% 
+    select(pred, succ, cdpcx_trigrams, is_blues)  %>% 
+    filter(is_blues == "blues") %>% 
+    group_by(pred) %>% 
+    summarise(n = n(), tot = nrow(.), freq = n/tot) %>% 
+    arrange(desc(freq))
+  no_blues_succ <- tmp %>% 
+    select(pred, succ, cdpcx_trigrams, is_blues)  %>% 
+    filter(is_blues != "blues") %>% 
+    group_by(succ) %>% 
+    summarise(n = n(), tot = nrow(.), freq = n/tot) %>% 
+    arrange(desc(freq))
+  no_blues_pred <- tmp %>% 
+    select(pred, succ, cdpcx_trigrams, is_blues)  %>% 
+    filter(is_blues != "blues") %>% 
+    group_by(pred) %>% 
+    summarise(n = n(), tot = nrow(.), freq = n/tot) %>% 
+    arrange(desc(freq))
+  succ <- no_blues_succ %>% select(succ, freq_no_blues = freq) %>% left_join(blues_succ %>% select(succ, freq_blues = freq)) %>% mutate(OR = freq_blues/freq_no_blues) %>% arrange(desc(OR))
+  pred <-no_blues_pred %>% select(pred, freq_no_blues = freq) %>% left_join(blues_pred %>% select(pred, freq_blues = freq)) %>% mutate(OR = freq_blues/freq_no_blues) %>% arrange(desc(OR))
+  browser()   
+}
+
+blues_trigrams_plot <- function(data = wjd_tpc, cut_off = .015, save  = T, blue_note = "B"){
+  tmp <- data %>% 
+    group_by(id) %>% 
+    mutate(cdpcx_bigrams = sprintf("%s%s", cdpcx, lead(cdpcx, default = "$")), 
+           cdpcx_trigrams = sprintf("%s%s%s", cdpcx, lead(cdpcx, default = "$"), lead(cdpcx, 2, default = "$")))  %>%
+    ungroup() %>% 
+    mutate(is_blues = factor(tonality_type == "BLUES", labels = c("no_blues", "blues"))) %>% 
+    filter(str_detect(substr(cdpcx_trigrams, 2, 2), blue_note)) %>% 
+    freq_table_group(is_blues, cdpcx_trigrams) %>% 
+    filter(freq_group > cut_off)  %>%  
+    pivot_wider(id_cols = c(cdpcx_trigrams), 
+                names_from = is_blues, 
+                values_from = freq_group)  %>% 
+    mutate(blues = set_na(blues, 0), 
+           no_blues = set_na(no_blues, 0),  
+           or = blues - no_blues, dominance = factor(or > 0, labels = c("Other", "Blues"))) %>% 
+    arrange(desc(or)) 
+  q <- tmp %>% ggplot(aes(blues, no_blues))
+  q <- q + ggrepel::geom_text_repel(aes(color = dominance, 
+                                        label = cdpcx_trigrams), 
+                                    size = 4, 
+                                    max.overlaps = 20) 
+  q <- q + theme_bw()  
+  q <- q + stat_function(mapping = aes(group = 1), fun = function(x) x) 
+  q <- q + geom_point() 
+  q <- q + labs(x = "Rel. Freq. Blues", y = "Rel. Freq. Other", color = "")  
+  q <- q + scale_color_manual(values = c("lightblue4", "indianred4"), guide = "none")
+  if(save){
+    ggsave(plot = q, filename = sprintf("figs/blues_trigrams_%s.png", blue_note), dpi = 600)
+  }
+  q
+}
+
+blues_bigrams_plot <- function(data = wjd_tpc, cut_off = .015, save  = T, blue_note = "B"){
+  tmp <- data %>% 
+    group_by(id) %>% 
+    mutate(cdpcx_bigrams = sprintf("%s%s", cdpcx, lead(cdpcx, default = "$")), 
+           cdpcx_trigrams = sprintf("%s%s%s", cdpcx, lead(cdpcx, default = "$"), lead(cdpcx, 2, default = "$")))  %>%
+    ungroup() %>% 
+    mutate(is_blues = factor(tonality_type == "BLUES", labels = c("no_blues", "blues"))) %>% 
+    filter(str_detect(cdpcx_bigrams, blue_note)) %>% 
+    freq_table_group(is_blues, cdpcx_bigrams) %>% 
+    filter(freq_group > cut_off)  %>%  
+    pivot_wider(id_cols = c(cdpcx_bigrams), 
+                names_from = is_blues, 
+                values_from = freq_group)  %>% 
+    mutate(blues = set_na(blues, 0), 
+           no_blues = set_na(no_blues, 0),  
+           or = blues - no_blues, 
+           dominance = factor(or > 0, labels = c("Other", "Blues"))) %>% 
+    arrange(desc(or)) 
+  
+  q <- tmp %>% ggplot(aes(blues, no_blues))
+  q <- q + ggrepel::geom_text_repel(aes(color = dominance, 
+                                        label = cdpcx_bigrams), 
+                                    size = 4, 
+                                    max.overlaps = 20) 
+  q <- q + theme_bw()  
+  q <- q + stat_function(mapping = aes(group = 1), fun = function(x) x) 
+  q <- q + geom_point() 
+  q <- q + labs(x = "Rel. Freq. Blues", y = "Rel. Freq. Other", color = "")  
+  q <- q + scale_color_manual(values = c("lightblue4", "indianred4"), guide = "none")
+  if(save){
+    ggsave(plot = q, filename = sprintf("figs/blues_bigrams_%s.png", blue_note), dpi = 600)
+  }
+  q
+}
+blub <- function(){
+  tmp <- wjd_transforms %>% 
+    group_by(id) %>% 
+    mutate(cdpcx_bigrams = sprintf("%s%s", cdpcx_raw, lead(cdpcx_raw, default = "$"))) 
+  b3_dist <- tmp %>% 
+    filter(str_detect(cdpcx_bigrams, "3B")) %>% 
+    freq_table(ioiclass_abs_raw) %>% 
+    filter(!is.na(ioiclass_abs_raw))
+  
+  no_b3_dist <- tmp %>% 
+    filter(!str_detect(cdpcx_bigrams, "3B")) %>% 
+    freq_table(ioiclass_abs_raw) %>% 
+    filter(!is.na(ioiclass_abs_raw))
+  browser()
+}
+blues_cpc_plot <- function(data = wjd_tpc){
+  tmp <- data %>% 
+    mutate(is_blues = factor(tonality_type != "BLUES", labels = c("Blues", "Other")),
+           cpc = factor(cpc, levels = 0:11),
+           cdpcx = nice_cdpcx(cdpcx), 
+           is_major = chord_type %in% c("6", "7", "maj", "maj7")) 
+  browser()
+  #q <- tmp %>% ggplot(aes(x = cpc, y = after_stat(count)/tapply(after_stat(count),after_stat(PANEL),sum)[after_stat(PANEL)]))
+  q <- tmp %>% ggplot(aes(x = cdpcx, y = after_stat(count)/tapply(after_stat(count),after_stat(PANEL),sum)[after_stat(PANEL)]))
+  q <- q + geom_bar()
+  q <- q + theme_bw()
+  q <- q + scale_y_continuous(labels = scales::percent, name = "Percentage (%)")
+  
+  q <- q + labs(x = "CPC", y = "Rel. Freq.")
+  q <- q  + facet_wrap(~is_blues)
+  q <- q + theme_bw()
   q
 }
