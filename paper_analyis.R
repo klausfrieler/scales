@@ -71,6 +71,7 @@ plot_pitch_type_by_year <- function(){
     pivot_wider(id_cols = style, names_from = cdpcx_type, values_from = m) %>% 
     select(c(1, 4, 3, 2)) %>% 
     knitr::kable(format = "latex", digits = 2)
+  print(tab)
   q <- tmp_freq %>% 
     filter(style != "FREE", style != "FUSION") %>% 
     mutate(cdpcx_type = factor(cdpcx_type, labels = c("Chord Tone", "Chromatic", "Diatonic")) %>% fct_reorder(freq), style = style_map[style]) %>% 
@@ -78,6 +79,7 @@ plot_pitch_type_by_year <- function(){
   q <- q + geom_point(size = 2) 
   q <- q + geom_smooth(method = "lm", aes(color  = cdpcx_type, group = cdpcx_type), size = 1, se = T) 
   q <- q + theme_bw() 
+  q <- q + scale_color_brewer(palette = "Set1")
   q <- q + labs( x = "Recording Year", y = "Rel. Frequency", color = "Pitch Type", shape = "Style")
   q
 }
@@ -223,7 +225,7 @@ scale_lsd_heat_map <- function(scale_fits, min_n = 100, fname = "", sort_scales 
   q
 }
 
-plot_all_heat_maps <- function(recalc = F){
+plot_all_heat_maps <- function(recalc = F, img_format = "png"){
   if(recalc || !exists("all_scale_fits_weighted_freq")){
     all_scale_fits_weighted_freq <-    
       get_all_scale_fits_fast(wjd_tpc, ret_top_n = 1, weighting = "chordal", cpc_tab = "freq")
@@ -249,16 +251,16 @@ plot_all_heat_maps <- function(recalc = F){
     writexl::write_xlsx(all_scale_fits_flat_ind, "all_scale_fits_flat_ind.xlsx")
   }
   q <- scale_lsd_heat_map(all_scale_fits_weighted_freq)
-  ggsave(plot = q, filename = "figs/all_scale_fits_weighted_freq.png", dpi = 600)
+  ggsave(plot = q, filename = sprintf("%s.%s", "figs/all_scale_fits_weighted_freq", img_format), dpi = 600)
 
   q <- scale_lsd_heat_map(all_scale_fits_weighted_ind)
-  ggsave(plot = q, filename = "figs/all_scale_fits_weighted_ind.png", dpi = 600)
+  ggsave(plot = q, filename = sprintf("%s.%s", "figs/all_scale_fits_weighted_ind", img_format), dpi = 600)
   
   q <- scale_lsd_heat_map(all_scale_fits_flat_freq)
-  ggsave(plot = q, filename = "figs/all_scale_fits_flat_freq.png", dpi = 600)
+  ggsave(plot = q, filename = sprintf("%s.%s", "figs/all_scale_fits_flat_freq", img_format), dpi = 600)
   
   q <- scale_lsd_heat_map(all_scale_fits_flat_ind)
-  ggsave(plot = q, filename = "figs/all_scale_fits_flat_ind.png", dpi = 600)
+  ggsave(plot = q, filename = sprintf("%s.%s", "figs/all_scale_fits_flat_ind", img_format), dpi = 600)
   return("Done")
 }
 
@@ -324,15 +326,15 @@ blues_trigrams_plot <- function(data = wjd_tpc, cut_off = .015, save  = T, blue_
   q <- tmp %>% ggplot(aes(blues, no_blues))
   q <- q + ggrepel::geom_text_repel(aes(color = dominance, 
                                         label = cdpcx_trigrams), 
-                                    size = 4, 
+                                    size = 6, 
                                     max.overlaps = 20) 
-  q <- q + theme_bw()  
+  q <- q + theme_bw(base_size = 16)  
   q <- q + stat_function(mapping = aes(group = 1), fun = function(x) x) 
   q <- q + geom_point() 
   q <- q + labs(x = "Rel. Freq. Blues", y = "Rel. Freq. Other", color = "")  
   q <- q + scale_color_manual(values = c("lightblue4", "indianred4"), guide = "none")
   if(save){
-    ggsave(plot = q, filename = sprintf("figs/blues_trigrams_%s.png", blue_note), dpi = 600)
+    ggsave(plot = q, filename = sprintf("figs/blues_trigrams_%s.eps", blue_note), dpi = 600)
   }
   q
 }
@@ -359,15 +361,17 @@ blues_bigrams_plot <- function(data = wjd_tpc, cut_off = .015, save  = T, blue_n
   q <- tmp %>% ggplot(aes(blues, no_blues))
   q <- q + ggrepel::geom_text_repel(aes(color = dominance, 
                                         label = cdpcx_bigrams), 
-                                    size = 4, 
+                                    size = 6, 
                                     max.overlaps = 20) 
-  q <- q + theme_bw()  
+  q <- q + theme_bw(base_size = 16)  
   q <- q + stat_function(mapping = aes(group = 1), fun = function(x) x) 
   q <- q + geom_point() 
   q <- q + labs(x = "Rel. Freq. Blues", y = "Rel. Freq. Other", color = "")  
-  q <- q + scale_color_manual(values = c("lightblue4", "indianred4"), guide = "none")
+  q <- q + scale_color_brewer(palette = "Set1") 
+  #q <- q + scale_color_manual(values = c("lightblue4", "indianred4"), guide = "none")
+  
   if(save){
-    ggsave(plot = q, filename = sprintf("figs/blues_bigrams_%s.png", blue_note), dpi = 600)
+    ggsave(plot = q, filename = sprintf("figs/blues_bigrams_%s.eps", blue_note), dpi = 600)
   }
   q
 }
@@ -402,5 +406,46 @@ blues_cpc_plot <- function(data = wjd_tpc){
   q <- q + labs(x = "CPC", y = "Rel. Freq.")
   q <- q  + facet_wrap(~is_blues)
   q <- q + theme_bw()
+  q
+}
+
+plot_v_sub_v_comp <- function(){
+  data <- wjd_tpc %>%  
+    mutate(style = factor(style_map[style], levels = c("Traditional","Modern", "Postmodern"))) %>%
+    filter(local_scale_degree == "IIb7" | local_scale_degree == "V7", cpc %in% c(6,7)) %>% 
+    select(style, local_scale_degree, cpc) %>% 
+    count(style, local_scale_degree, cpc) %>% 
+    group_by(style, local_scale_degree) %>% 
+    mutate(tot_n = sum(n), f = n/tot_n, 
+           cpc = c("#11", "7")[cpc - 5], 
+           chord = c("IIb7" = "SubV7", "V7" = "V7")[local_scale_degree]) 
+  q <- q %>% ggplot(aes(x = style, y = f, fill = cpc)) 
+  q <- q + geom_col(position = position_dodge()) 
+  q <- q +  facet_wrap(~fct_rev(chord))  
+  q <- q + theme_bw() 
+  q <- q + scale_fill_brewer(palette = "Set1")  
+  q <- q + theme(axis.text.x = element_text(size = 14), 
+                 axis.text.y = element_text(size = 14), 
+                 legend.text =  element_text(size = 14), 
+                 strip.text = element_text(size = 14), 
+                 strip.background =  element_rect(fill = "white")) 
+  q <- q + labs(x = "", y = "Percentage (%)", fill = "")
+  ggsave("figs/v_subv_comp.eps", scale = 1)
+}
+
+plot_cdpcx_dist <- function(data = wjd_tpc, save  = T){
+  q <- wjd_tpc %>% get_cdpcx_table() %>%  ggplot(aes(x = cpc, y = rel_freq_cht, fill = cdpcx_type)) 
+  q <- q + geom_col() 
+  q <- q + theme_bw(base_size = 16) 
+  q <- q + labs(x  = "Chordal Pitch Class", y = "Percentage (%)", fill = "") 
+  q <- q + scale_fill_brewer(palette = "Set1", direction = -1) 
+  q <- q + scale_y_continuous(labels = scales::percent) 
+  q <- q + facet_wrap(~chord_type, scales = "free_y") 
+  q <- q + theme(legend.position = "top", strip.background = element_rect(fill = "white")) 
+  if(save){
+    ggsave("figs/cdpcx_dist.eps", scale = 1)
+    
+  }
+  q
   q
 }

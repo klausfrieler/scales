@@ -117,6 +117,7 @@ set_na <- function(x, value){
 freq_table_group <- function(x, group_var, prop_var, sort = T) {
   group_var <- enquo(group_var)
   prop_var  <- enquo(prop_var)
+  browser()
   tmp <- x %>%
     group_by(!!group_var) %>% 
     mutate(n_group = n()) %>% 
@@ -132,6 +133,54 @@ freq_table_group <- function(x, group_var, prop_var, sort = T) {
   #tmp %>% ggplotf(aes_string(x = rlang::quo_text(prop_var), y= "freq")) + geom_col()
 }
 
+freq_table_group2 <- function(x, group_var, prop_var, sort = T) {
+  tmp <- x %>%
+    group_by(across(all_of(group_var))) %>% 
+    mutate(n_group = n()) %>% 
+    ungroup() %>% 
+    group_by(across(all_of(c(group_var, prop_var, "n_group")))) %>%
+    summarise(n = n(), 
+              .groups = "drop" ) %>%
+    mutate(freq = n /sum(n), freq_group = n/n_group)
+  if(sort){
+    tmp <- tmp %>% arrange(desc(n))
+  }
+  tmp
+  #tmp %>% ggplotf(aes_string(x = rlang::quo_text(prop_var), y= "freq")) + geom_col()
+}
+get_cdpcx_table <- function(data = wjd_tpc){
+  data <- wjd_tpc %>% 
+    filter(cdpcx != "X") %>% 
+    mutate(cdpcx_type = factor(cdpcx_class[cdpcx], 
+                               labels = c("Chord Tone", "Chromatic", "Diatonic")) %>% 
+             factor(levels = c("Chord Tone", "Diatonic", "Chromatic")))
+  data[data$chord_type == "o",]$chord_type <- "o(7)"
+  data[data$chord_type == "o7",]$chord_type <- "o(7)"
+  data[data$chord_type == "min",]$chord_type <- "min(7)"
+  data[data$chord_type == "min7",]$chord_type <- "min(7)"
+  data[data$chord_type == "maj",]$chord_type <- "maj(7)"
+  data[data$chord_type == "maj7",]$chord_type <- "maj(7)"
+  browser()
+  data[data$chord_type == "o(7)" ,]$cdpcx_type <- c("Chord Tone", "Chromatic", "Diatonic")[(data[data$chord_type == "o(7)" ,]$cpc %% 3) + 1]
+  
+  #browser()
+  tab <- data %>% 
+    group_by(chord_type) %>% 
+    mutate(n_cht = n()) %>% 
+    ungroup() 
+  tab <- tab %>% 
+    group_by(cdpcx_type) %>% 
+    mutate(n_cxt = n()) %>% 
+    ungroup() 
+  tab <- tab %>% 
+    group_by(chord_type, cdpcx_type, cpc) %>% 
+    summarise(freq = n(), 
+              rel_freq_cht = freq/mean(n_cht),
+              rel_freq_cxt = freq/mean(n_cxt),
+              .groups ="drop")
+  tab
+  
+}
 get_standard_weights <- function(x, maj = 2, min = 1){
   w <- rep(min, 12)
   if(is.character(x)){
@@ -585,6 +634,7 @@ get_all_scale_fits_fast <- function(data = wjd_tpc,
                                     weighting = c("chordal", "flat"), 
                                     cpc_tab = c("freq", "indicator"),
                                     norm = c("euclid", "max")){
+  #browser()
   ids <- unique(data$id)
   weighting <- match.arg(weighting)
   norm <- match.arg(norm)
